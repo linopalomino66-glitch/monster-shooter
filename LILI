@@ -1,1 +1,642 @@
 
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monster Shooter</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+        }
+        h1 { color: #e94560; font-size: 2.5rem; text-shadow: 0 0 20px #e94560; margin-bottom: 10px; letter-spacing: 3px; }
+        #gameContainer { position: relative; border: 4px solid #e94560; border-radius: 10px; box-shadow: 0 0 30px rgba(233, 69, 96, 0.5); }
+        canvas { display: block; background: #0a0a15; border-radius: 6px; }
+        #ui { position: absolute; top: 10px; left: 10px; color: white; font-size: 16px; text-shadow: 2px 2px 4px black; pointer-events: none; }
+        #ui div { margin: 5px 0; }
+        .player-info { color: #4ecca3; }
+        .level-info { color: #f39c12; font-size: 20px; font-weight: bold; }
+        .wave-info { color: #e74c3c; }
+        .score-info { color: #00d9ff; }
+        #menu, #weaponMenu, #gameOverScreen, #victoryScreen, #levelComplete { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; border-radius: 6px; }
+        #menu { background: rgba(0,0,0,0.95); }
+        #weaponMenu { background: rgba(0,0,0,0.95); }
+        #gameOverScreen, #victoryScreen, #levelComplete { background: rgba(0,0,0,0.9); }
+        #weaponMenu h2, #menu h2 { font-size: 2rem; color: #e94560; margin-bottom: 20px; }
+        #levelComplete h2 { color: #f1c40f; font-size: 2.5rem; }
+        #victoryScreen h2 { color: #f1c40f; font-size: 3rem; }
+        #gameOverScreen h2 { color: #e74c3c; font-size: 3rem; }
+        .btn { background: linear-gradient(45deg, #e94560, #c73e54); color: white; border: none; padding: 15px 40px; font-size: 1.2rem; margin: 10px; cursor: pointer; border-radius: 25px; transition: all 0.3s; font-weight: bold; text-transform: uppercase; }
+        .btn:hover { transform: scale(1.1); box-shadow: 0 0 20px #e94560; }
+        .player-select { display: flex; gap: 20px; margin: 20px 0; }
+        .player-btn { width: 80px; height: 80px; border-radius: 50%; border: 3px solid #4ecca3; background: #1a1a2e; color: white; font-size: 1.5rem; cursor: pointer; transition: all 0.3s; }
+        .player-btn:hover, .player-btn.selected { background: #4ecca3; color: #1a1a2e; transform: scale(1.1); }
+        .weapon-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; max-width: 600px; }
+        .weapon-card { background: #1a1a2e; border: 2px solid #4ecca3; border-radius: 10px; padding: 15px 25px; cursor: pointer; transition: all 0.3s; text-align: left; }
+        .weapon-card:hover { background: #4ecca3; transform: scale(1.05); }
+        .weapon-card h3 { color: #4ecca3; margin-bottom: 5px; }
+        .weapon-card:hover h3 { color: #1a1a2e; }
+        .weapon-card p { color: #888; font-size: 12px; }
+        .health-bar { width: 150px; height: 20px; background: #333; border-radius: 10px; overflow: hidden; }
+        .health-fill { height: 100%; background: linear-gradient(90deg, #e74c3c, #c0392b); transition: width 0.3s; }
+        #collectibleMessage { position: absolute; bottom: 80px; left: 50%; transform: translateX(-50%); background: rgba(233, 69, 96, 0.9); padding: 10px 30px; border-radius: 20px; font-size: 18px; display: none; }
+        #controls { color: #888; margin-top: 10px; font-size: 14px; text-align: center; }
+        #weaponShop { background: rgba(0,0,0,0.95); }
+        #weaponShop h2 { font-size: 2rem; color: #e94560; margin-bottom: 20px; }
+        .shop-weapon-card { background: #1a1a2e; border: 2px solid #f1c40f; border-radius: 10px; padding: 15px 25px; cursor: pointer; transition: all 0.3s; text-align: left; }
+        .shop-weapon-card:hover { background: #f1c40f; transform: scale(1.05); }
+        .shop-weapon-card.owned { border-color: #27ae60; opacity: 0.6; cursor: not-allowed; }
+        .shop-weapon-card.owned:hover { background: #1a1a2e; transform: none; }
+        .shop-weapon-card h3 { color: #f1c40f; margin-bottom: 5px; }
+        .shop-weapon-card.owned h3 { color: #27ae60; }
+        .shop-weapon-card:hover h3 { color: #1a1a2e; }
+        .shop-weapon-card p { color: #888; font-size: 12px; }
+        .shop-weapon-card:hover p { color: #333; }
+        .shop-weapon-card .price { color: #f1c40f; font-weight: bold; margin-top: 5px; }
+        .shop-weapon-card.owned .price { color: #27ae60; }
+    </style>
+</head>
+<body>
+    <h1>MONSTER SHOOTER</h1>
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="1200" height="700"></canvas>
+        <div id="ui">
+            <div class="level-info">NIVEAU: <span id="levelNum">1</span>/20</div>
+            <div class="wave-info">Vague: <span id="waveNum">1</span>/<span id="waveTotal">3</span></div>
+            <div class="score-info">SCORE: <span id="score">0</span></div>
+            <div id="player1UI" class="player-info">P1: <div class="health-bar"><div class="health-fill" id="p1Health"></div></div></div>
+            <div id="player2UI" class="player-info" style="display:none">P2: <div class="health-bar"><div class="health-fill" id="p2Health"></div></div></div>
+            <div id="player3UI" class="player-info" style="display:none">P3: <div class="health-bar"><div class="health-fill" id="p3Health"></div></div></div>
+        </div>
+        <div id="collectibleMessage"></div>
+        <div id="menu">
+            <h2>MONSTER SHOOTER</h2>
+            <p style="color:#888; margin-bottom:20px;">20 Niveaux - Armes - Multiplayer</p>
+            <p>Nombre de joueurs:</p>
+            <div class="player-select">
+                <button class="player-btn selected" onclick="selectPlayers(1)">1</button>
+                <button class="player-btn" onclick="selectPlayers(2)">2</button>
+                <button class="player-btn" onclick="selectPlayers(3)">3</button>
+            </div>
+            <button class="btn" onclick="goToWeaponSelect()">COMMENCER</button>
+        </div>
+        <div id="weaponMenu" style="display:none;">
+            <h2>CHOISISSEZ VOTRE ARME</h2>
+            <div class="weapon-grid">
+                <div class="weapon-card" onclick="chooseWeapon(0)">
+                    <h3 style="color:#fff;">Pistolet</h3>
+                    <p>Rapide, precis - Arme de base</p>
+                </div>
+            </div>
+        </div>
+        <div id="gameOverScreen" style="display:none;">
+            <h2>GAME OVER</h2>
+            <p id="finalScore">Score: 0</p>
+            <button class="btn" onclick="restartGame()">REJOUER</button>
+        </div>
+        <div id="victoryScreen" style="display:none;">
+            <h2>VICTOIRE!</h2>
+            <p id="victoryScore">Score: 0</p>
+            <button class="btn" onclick="restartGame()">REJOUER</button>
+        </div>
+        <div id="levelComplete" style="display:none;">
+            <h2>NIVEAU COMPLET!</h2>
+            <p id="levelRewards"></p>
+            <button class="btn" onclick="goToShop()">BOUTIQUE D'ARMES</button>
+            <button class="btn" onclick="nextLevel()">NIVEAU SUIVANT</button>
+        </div>
+        <div id="weaponShop" style="display:none;">
+            <h2>BOUTIQUE D'ARMES</h2>
+            <p style="color:#f1c40f; margin-bottom:15px;">POINTS: <span id="shopPoints">0</span> P | MAX 3 ARMES/JOUEUR</p>
+            <div class="weapon-grid" id="shopGrid"></div>
+            <button class="btn" onclick="closeShop()">CONTINUER</button>
+        </div>
+    </div>
+    <div id="controls">
+        WASD: deplacer | ESPACE: tirer | X: jetter arme | 1-3: changer arme | Z: gagner
+    </div>
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        let gameRunning = false;
+        let numPlayers = 1;
+        let level = 1;
+        let wave = 1;
+        let wavesInLevel = 3;
+        let score = 0;
+        
+        const allWeapons = [
+            {name:'Pistolet',damage:10,fireRate:200,speed:100,color:'#ffffff',size:4},
+            {name:'Fusil a pompe',damage:30,fireRate:100,speed:12,color:'#f39c12',size:28, pellets:5},
+            {name:'Lance-flammes',damage:5,fireRate:50,speed:8,color:'#e74c3c',size:15, flame:true},
+            {name:'Fusil sniper',damage:80,fireRate:100,speed:25,color:'#9b59b6',size:23, pierce:true},
+            {name:'Plasma',damage:25,fireRate:150,speed:10,color:'#00ffff',size:10, explosive:true},
+            {name:'Minigun',damage:28,fireRate:50,speed:18,color:'#f1c40f',size:23},
+            {name:'Arc electrique',damage:15,fireRate:100,speed:20,color:'#00ff00',size:25, chain:true},
+            {name:'Canon orbital',damage:100,fireRate:1500,speed:5,color:'#ff00ff',size:20},
+            {name:'Fusil d assaut',damage:35,fireRate:80,speed:15,color:'#2ecc71',size:22},
+            {name:'Pistolet laser',damage:20,fireRate:120,speed:18,color:'#e67e22',size:18},
+            {name:'Canon a neutrons',damage:90,fireRate:800,speed:8,color:'#3498db',size:25},
+            {name:'Lance missiles',damage:60,fireRate:600,speed:12,color:'#1abc9c',size:24, explosive:true},
+            {name:'Fusil a rail',damage:120,fireRate:2000,speed:30,color:'#9b59b6',size:22, pierce:true},
+            {name:'Pistoletmitrailleur',damage:18,fireRate:40,speed:14,color:'#34495e',size:16},
+            {name:'Canon plasma',damage:45,fireRate:300,speed:11,color:'#16a085',size:20},
+            {name:'Sniper lourd',damage:150,fireRate:2500,speed:28,color:'#8e44ad',size:26, pierce:true},
+            {name:'Lance grenades',damage:40,fireRate:500,speed:9,color:'#27ae60',size:19, explosive:true},
+            {name:'Pistolet electrique',damage:25,fireRate:180,speed:16,color:'#f39c12',size:15},
+            {name:'Fusil pulse',damage:55,fireRate:150,speed:17,color:'#d35400',size:21},
+            {name:'Canon gamma',damage:75,fireRate:400,speed:10,color:'#c0392b',size:23},
+            {name:'Arme sonique',damage:30,fireRate:100,speed:13,color:'#2980b9',size:17},
+            {name:'Lance feu compact',damage:8,fireRate:30,speed:7,color:'#e74c3c',size:12, flame:true},
+            {name:'Pistolet a eau',damage:12,fireRate:150,speed:12,color:'#3498db',size:14},
+            {name:'Canon magnetique',damage:65,fireRate:350,speed:14,color:'#9b59b6',size:22},
+            {name:'Fusil ionique',damage:50,fireRate:200,speed:16,color:'#1abc9c',size:20},
+            {name:'Lance roquettes',damage:80,fireRate:800,speed:10,color:'#e67e22',size:24, explosive:true},
+            {name:'Pistolet tactique',damage:22,fireRate:100,speed:15,color:'#7f8c8d',size:16},
+            {name:'Canon Tesla',damage:70,fireRate:450,speed:13,color:'#f1c40f',size:21, chain:true},
+            {name:'Fusil photonique',damage:85,fireRate:250,speed:19,color:'#00cec9',size:23},
+            {name:'Lance plasma lourd',damage:55,fireRate:280,speed:11,color:'#6c5ce7',size:20},
+            {name:'Pistolet revolver',damage:35,fireRate:300,speed:14,color:'#d63031',size:17},
+            {name:'Canon dimensionnel',damage:100,fireRate:1200,speed:9,color:'#a29bfe',size:25},
+            {name:'Fusil balistique',damage:40,fireRate:120,speed:15,color:'#fab1a0',size:19},
+            {name:'Lance bombes',damage:90,fireRate:900,speed:8,color:'#ff7675',size:22, explosive:true},
+            {name:'Pistolet a impulsion',damage:28,fireRate:80,speed:17,color:'#74b9ff',size:16},
+            {name:'Canon cryo',damage:20,fireRate:200,speed:12,color:'#0984e3',size:18, freeze:true},
+            {name:'Fusil gravitique',damage:95,fireRate:500,speed:14,color:'#6c5ce7',size:24},
+            {name:'Lance particules',damage:50,fireRate:180,speed:16,color:'#00b894',size:20}
+        ];
+        
+        const allMonsters = [
+            {name:'yannick',hp:20,speed:2,size:20,color:'#27ae60',damage:10,points:10},
+            {name:'adam',hp:40,speed:1.5,size:30,color:'#8b4513',damage:20,points:25},
+            {name:'jules',hp:30,speed:3,size:25,color:'#ecf0f1',damage:15,points:20},
+            {name:'merde',hp:60,speed:2,size:35,color:'#c0392b',damage:25,points:40},
+            {name:'putain',hp:100,speed:1,size:45,color:'#8e44ad',damage:35,points:60},
+            {name:'con',hp:50,speed:2.5,size:28,color:'#660000',damage:20,points:50},
+            {name:'toc toc',hp:70,speed:3,size:32,color:'#4a4a4a',damage:20,points:55},
+            {name:'pute',hp:150,speed:0.8,size:60,color:'#8b7355',damage:20,points:100},
+            {name:'sale chien',hp:35,speed:4,size:22,color:'#1a1a1a',damage:20,points:45},
+            {name:'batar',hp:200,speed:1.5,size:70,color:'#ff0000',damage:50,points:200}
+        ];
+        
+        let players = [];
+        let bullets = [];
+        let enemies = [];
+        let collectibles = [];
+        let particles = [];
+        
+        const MAX_WEAPONS = 3;
+        
+        const keys = {};
+        document.addEventListener('keydown', e => keys[e.code] = true);
+        document.addEventListener('keyup', e => keys[e.code] = false);
+        
+        function selectPlayers(n) {
+            numPlayers = n;
+            document.querySelectorAll('.player-btn').forEach((btn, i) => {
+                btn.classList.toggle('selected', i === n - 1);
+            });
+        }
+        
+        function goToWeaponSelect() {
+            document.getElementById('menu').style.display = 'none';
+            document.getElementById('weaponMenu').style.display = 'flex';
+        }
+        
+        function chooseWeapon(wIndex) {
+            document.getElementById('weaponMenu').style.display = 'none';
+            
+            players = [
+                {x:100,y:350,id:0,size:25,speed:5,hp:100,maxHp:100,weapon:wIndex,lastShot:0,color:'#4ecca3',vx:0,vy:0,inventory:[wIndex]},
+                {x:250,y:350,id:1,size:25,speed:5,hp:100,maxHp:100,weapon:wIndex,lastShot:0,color:'#3498db',vx:0,vy:0,inventory:[wIndex]},
+                {x:400,y:350,id:2,size:25,speed:5,hp:100,maxHp:100,weapon:wIndex,lastShot:0,color:'#e74c3c',vx:0,vy:0,inventory:[wIndex]}
+            ];
+            
+            if (numPlayers === 1) players = [players[0]];
+            else if (numPlayers === 2) players = [players[0], players[1]];
+            
+            score = 0;
+            level = 1;
+            wave = 1;
+            
+            document.getElementById('score').textContent = '0';
+            document.getElementById('levelNum').textContent = '1';
+            document.getElementById('waveTotal').textContent = '3';
+            if (numPlayers >= 2) document.getElementById('player2UI').style.display = 'block';
+            if (numPlayers >= 3) document.getElementById('player3UI').style.display = 'block';
+            
+            gameRunning = true;
+            startLevel();
+            gameLoop();
+        }
+        
+        function startLevel() {
+            wave = 1;
+            startWave();
+        }
+        
+        function startWave() {
+            enemies = [];
+            bullets = [];
+            const enemyCount = 3 + level * 2 + wave * 2;
+            for (let i = 0; i < enemyCount; i++) spawnEnemy();
+            spawnCollectibles();
+            document.getElementById('waveNum').textContent = wave;
+        }
+        
+        function spawnEnemy() {
+            const unlockedMonsters = Math.min(2 + Math.floor(level / 2), allMonsters.length);
+            const type = Math.floor(Math.random() * unlockedMonsters);
+            const m = allMonsters[type];
+            const side = Math.floor(Math.random() * 4);
+            let x, y;
+            switch(side) {
+                case 0: x = -50; y = Math.random() * canvas.height; break;
+                case 1: x = canvas.width + 50; y = Math.random() * canvas.height; break;
+                case 2: x = Math.random() * canvas.width; y = -50; break;
+                case 3: x = Math.random() * canvas.width; y = canvas.height + 50; break;
+            }
+            enemies.push({
+                x, y, name: m.name, hp: m.hp + level * 10, maxHp: m.hp + level * 10,
+                speed: m.speed + level * 0.1, size: m.size, color: m.color,
+                damage: m.damage + level * 2, points: m.points + level * 5, type: type
+            });
+        }
+        
+        function spawnCollectibles() {
+            collectibles = [];
+            for (let i = 0; i < 3 + level; i++) {
+                collectibles.push({
+                    x: Math.random() * (canvas.width - 100) + 50,
+                    y: Math.random() * (canvas.height - 100) + 50,
+                    type: 'point', value: 5 + level * 2, size: 10, bob: Math.random() * Math.PI * 2
+                });
+            }
+        }
+        
+        function update() {
+            if (!gameRunning) return;
+            
+            players.forEach((p, idx) => {
+                let ax = 0, ay = 0;
+                if (keys['KeyW'] || keys['ArrowUp']) ay -= 1;
+                if (keys['KeyS'] || keys['ArrowDown']) ay += 1;
+                if (keys['KeyA'] || keys['ArrowLeft']) ax -= 1;
+                if (keys['KeyD'] || keys['ArrowRight']) ax += 1;
+                if (keys['KeyZ']) { victory(); return; }
+                
+                if (ax !== 0 || ay !== 0) {
+                    const len = Math.sqrt(ax*ax + ay*ay);
+                    p.vx = (ax/len) * p.speed;
+                    p.vy = (ay/len) * p.speed;
+                } else {
+                    p.vx *= 0.8;
+                    p.vy *= 0.8;
+                }
+                
+                // Changement d'arme avec touches 1-3
+                if (keys['Digit1'] && p.inventory.length >= 1) p.weapon = p.inventory[0];
+                if (keys['Digit2'] && p.inventory.length >= 2) p.weapon = p.inventory[1];
+                if (keys['Digit3'] && p.inventory.length >= 3) p.weapon = p.inventory[2];
+                
+                if (keys['KeyX']) dropWeapon(p);
+                if (keys['Space']) shoot(p, idx);
+                
+                p.x += p.vx;
+                p.y += p.vy;
+                p.x = Math.max(p.size, Math.min(canvas.width - p.size, p.x));
+                p.y = Math.max(p.size, Math.min(canvas.height - p.size, p.y));
+            });
+            
+            bullets = bullets.filter(b => {
+                b.x += Math.cos(b.angle) * b.speed;
+                b.y += Math.sin(b.angle) * b.speed;
+                if (b.flame) {
+                    particles.push({x: b.x, y: b.y, vx: (Math.random() - 0.5) * 2, vy: (Math.random() - 0.5) * 2, size: b.size * 0.5, color: b.color, life: 10});
+                }
+                return b.x > -50 && b.x < canvas.width + 50 && b.y > -50 && b.y < canvas.height + 50 && b.life > 0;
+            });
+            
+            enemies.forEach(e => {
+                let nearest = players[0];
+                let minDist = Infinity;
+                players.forEach(p => {
+                    const d = Math.hypot(p.x - e.x, p.y - e.y);
+                    if (d < minDist) { minDist = d; nearest = p; }
+                });
+                const angle = Math.atan2(nearest.y - e.y, nearest.x - e.x);
+                e.x += Math.cos(angle) * e.speed;
+                e.y += Math.sin(angle) * e.speed;
+                
+                players.forEach(p => {
+                    if (Math.hypot(p.x - e.x, p.y - e.y) < p.size + e.size) {
+                        p.hp -= e.damage * 0.02;
+                        updateHealthUI();
+                    }
+                });
+                
+                bullets.forEach(b => {
+                    if (Math.hypot(b.x - e.x, b.y - e.y) < e.size + b.size) {
+                        e.hp -= b.damage;
+                        b.life--;
+                        if (!b.pierce) b.life = 0;
+                        if (b.explosive) {
+                            createExplosion(b.x, b.y, 50, '#00ffff');
+                            enemies.forEach(e2 => { if (Math.hypot(e2.x - b.x, e2.y - b.y) < 50) e2.hp -= 30; });
+                        }
+                        for (let i = 0; i < 5; i++) {
+                            particles.push({x: e.x, y: e.y, vx: (Math.random()-0.5)*5, vy: (Math.random()-0.5)*5, size: 5, color: '#e94560', life: 20});
+                        }
+                    }
+                });
+            });
+            
+            enemies = enemies.filter(e => {
+                if (e.hp <= 0) { score += e.points; document.getElementById('score').textContent = score; createExplosion(e.x, e.y, e.size, e.color); return false; }
+                return true;
+            });
+            
+            collectibles = collectibles.filter(c => {
+                c.bob += 0.1;
+                let collected = false;
+                players.forEach(p => {
+                    if (Math.hypot(p.x - c.x, p.y - c.y) < p.size + c.size) {
+                        if (c.type === 'point') { score += c.value; document.getElementById('score').textContent = score; }
+                        collected = true;
+                    }
+                });
+                return !collected;
+            });
+            
+            particles = particles.filter(p => { p.x += p.vx; p.y += p.vy; p.life--; p.size *= 0.95; return p.life > 0; });
+            
+            if (enemies.length === 0) {
+                score += 10;
+                document.getElementById('score').textContent = score;
+                wave++;
+                if (wave > wavesInLevel) levelComplete();
+                else setTimeout(startWave, 1500);
+            }
+            
+            players.forEach(p => { if (p.hp <= 0) gameOver(); });
+            updateHealthUI();
+        }
+        
+        function switchWeapon(p, dir) {
+            const idx = p.inventory.indexOf(p.weapon);
+            let newIdx = idx + dir;
+            if (newIdx < 0) newIdx = p.inventory.length - 1;
+            if (newIdx >= p.inventory.length) newIdx = 0;
+            p.weapon = p.inventory[newIdx];
+        }
+        
+        function dropWeapon(p) {
+            if (p.inventory.length <= 1) { showCollectMessage('MIN 1 ARME'); return; }
+            const idx = p.inventory.indexOf(p.weapon);
+            p.inventory.splice(idx, 1);
+            p.weapon = p.inventory[0];
+            showCollectMessage('ARME JETEE');
+        }
+        
+        function showCollectMessage(msg) {
+            const el = document.getElementById('collectibleMessage');
+            el.textContent = msg;
+            el.style.display = 'block';
+            setTimeout(() => el.style.display = 'none', 2000);
+        }
+        
+        function shoot(player, playerIndex) {
+            const now = Date.now();
+            const w = allWeapons[player.weapon];
+            if (now - player.lastShot < w.fireRate) return;
+            player.lastShot = now;
+            
+            let angle = 0;
+            let nearest = null;
+            let minDist = 300;
+            enemies.forEach(e => { const d = Math.hypot(e.x - player.x, e.y - player.y); if (d < minDist) { minDist = d; nearest = e; } });
+            if (nearest) angle = Math.atan2(nearest.y - player.y, nearest.x - player.x);
+            
+            if (w.pellets) {
+                for (let i = 0; i < w.pellets; i++) {
+                    const spread = (Math.random() - 0.5) * 0.5;
+                    bullets.push({x: player.x, y: player.y, angle: angle + spread, speed: w.speed, size: w.size, color: w.color, life: 100, damage: w.damage, pierce: w.pierce, explosive: w.explosive, flame: w.flame});
+                }
+            } else {
+                bullets.push({x: player.x, y: player.y, angle: angle, speed: w.speed, size: w.size, color: w.color, life: 100, damage: w.damage, pierce: w.pierce, explosive: w.explosive, flame: w.flame});
+            }
+        }
+        
+        function createExplosion(x, y, size, color) {
+            for (let i = 0; i < 20; i++) {
+                const angle = (Math.PI * 2 / 20) * i;
+                particles.push({x, y, vx: Math.cos(angle) * (Math.random() * 5 + 2), vy: Math.sin(angle) * (Math.random() * 5 + 2), size: size * 0.3, color: color, life: 30});
+            }
+        }
+        
+        function levelComplete() {
+            gameRunning = false;
+            document.getElementById('levelRewards').textContent = '+1000 points';
+            document.getElementById('levelComplete').style.display = 'flex';
+        }
+        
+        function nextLevel() {
+            document.getElementById('levelComplete').style.display = 'none';
+            if (level >= 20) { victory(); return; }
+            level++;
+            score += 1000;
+            document.getElementById('score').textContent = score;
+            document.getElementById('levelNum').textContent = level;
+            players.forEach((p, i) => { p.x = 100 + i * 150; p.y = 350; p.hp = Math.min(p.hp + 30, p.maxHp); });
+            gameRunning = true;
+            startLevel();
+            gameLoop();
+        }
+        
+        function updateHealthUI() {
+            if (players[0]) document.getElementById('p1Health').style.width = Math.max(0, players[0].hp) + '%';
+            if (players[1]) document.getElementById('p2Health').style.width = Math.max(0, players[1].hp) + '%';
+            if (players[2]) document.getElementById('p3Health').style.width = Math.max(0, players[2].hp) + '%';
+        }
+        
+        function draw() {
+            ctx.fillStyle = '#1a1a2e';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            if (!gameRunning) return;
+            
+            collectibles.forEach(c => {
+                const bobY = Math.sin(c.bob) * 5;
+                ctx.save();
+                ctx.shadowBlur = 20;
+                ctx.shadowColor = '#f1c40f';
+                ctx.fillStyle = '#f1c40f';
+                ctx.beginPath();
+                ctx.arc(c.x, c.y + bobY, c.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#fff';
+                ctx.font = 'bold 12px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('+' + c.value, c.x, c.y + 4 + bobY);
+                ctx.restore();
+            });
+            
+            bullets.forEach(b => {
+                ctx.save();
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = b.color;
+                ctx.fillStyle = b.color;
+                ctx.beginPath();
+                ctx.arc(b.x, b.y, b.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            });
+            
+            enemies.forEach(e => {
+                ctx.save();
+                const hpPercent = e.hp / e.maxHp;
+                ctx.fillStyle = '#333';
+                ctx.fillRect(e.x - e.size, e.y - e.size - 15, e.size * 2, 8);
+                ctx.fillStyle = hpPercent > 0.5 ? '#27ae60' : hpPercent > 0.25 ? '#f39c12' : '#e74c3c';
+                ctx.fillRect(e.x - e.size, e.y - e.size - 15, e.size * 2 * hpPercent, 8);
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = e.color;
+                ctx.fillStyle = e.color;
+                ctx.beginPath();
+                ctx.arc(e.x, e.y, e.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#fff';
+                ctx.beginPath();
+                ctx.arc(e.x - e.size/3, e.y - e.size/4, e.size/4, 0, Math.PI * 2);
+                ctx.arc(e.x + e.size/3, e.y - e.size/4, e.size/4, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#000';
+                ctx.beginPath();
+                ctx.arc(e.x - e.size/3, e.y - e.size/4, e.size/8, 0, Math.PI * 2);
+                ctx.arc(e.x + e.size/3, e.y - e.size/4, e.size/8, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#fff';
+                ctx.font = 'bold 12px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(e.name, e.x, e.y + e.size + 15);
+                ctx.restore();
+            });
+            
+            players.forEach((p, i) => {
+                if (p.hp <= 0) return;
+                ctx.save();
+                ctx.shadowBlur = 20;
+                ctx.shadowColor = p.color;
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#fff';
+                ctx.font = 'bold 20px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(i + 1, p.x, p.y + 7);
+                ctx.fillStyle = allWeapons[p.weapon].color;
+                ctx.font = '14px Arial';
+                ctx.fillText(allWeapons[p.weapon].name, p.x, p.y + p.size + 20);
+                ctx.restore();
+            });
+            
+            particles.forEach(p => {
+                ctx.save();
+                ctx.globalAlpha = p.life / 30;
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            });
+        }
+        
+        function gameOver() {
+            gameRunning = false;
+            document.getElementById('gameOverScreen').style.display = 'flex';
+            document.getElementById('finalScore').textContent = 'Score: ' + score + ' | Niveau: ' + level;
+        }
+        
+        function victory() {
+            gameRunning = false;
+            document.getElementById('victoryScreen').style.display = 'flex';
+            document.getElementById('victoryScore').textContent = 'Score Final: ' + score;
+        }
+        
+        function restartGame() {
+            document.getElementById('gameOverScreen').style.display = 'none';
+            document.getElementById('victoryScreen').style.display = 'none';
+            document.getElementById('menu').style.display = 'flex';
+            level = 1; wave = 1; score = 0;
+            players = []; bullets = []; enemies = []; collectibles = []; particles = [];
+            document.getElementById('levelNum').textContent = '1';
+            document.getElementById('score').textContent = '0';
+            document.getElementById('player2UI').style.display = 'none';
+            document.getElementById('player3UI').style.display = 'none';
+        }
+        
+        const weaponPrices = [0,30,50,70,80,60,90,100,35,25,95,75,110,20,55,120,45,28,40,65,30,15,10,70,45,85,22,80,50,60,35,105,42,92,32,55,95,50];
+        
+        function goToShop() {
+            document.getElementById('levelComplete').style.display = 'none';
+            document.getElementById('weaponShop').style.display = 'flex';
+            document.getElementById('shopPoints').textContent = score;
+            renderShop();
+        }
+        
+        function renderShop() {
+            const grid = document.getElementById('shopGrid');
+            grid.innerHTML = '';
+            for (let i = 1; i < allWeapons.length; i++) {
+                const w = allWeapons[i];
+                const owned = players.some(p => p.inventory.includes(i));
+                const canAfford = score >= weaponPrices[i];
+                const card = document.createElement('div');
+                card.className = 'shop-weapon-card' + (owned ? ' owned' : '');
+                card.innerHTML = `<h3 style="color:${w.color}">${w.name}</h3><p>Degats: ${w.damage} | Cadence: ${w.fireRate}ms</p><div class="price">${owned ? 'POSSEDE' : weaponPrices[i] + ' P'}</div>`;
+                if (!owned && canAfford) {
+                    card.onclick = () => buyWeapon(i);
+                }
+                grid.appendChild(card);
+            }
+        }
+        
+        function buyWeapon(index) {
+            const price = weaponPrices[index];
+            // Donner l'arme au joueur actuel (premier joueur)
+            const p = players[0];
+            if (score >= price && !p.inventory.includes(index) && p.inventory.length < MAX_WEAPONS) {
+                score -= price;
+                p.inventory.push(index);
+                p.weapon = index;
+                document.getElementById('shopPoints').textContent = score;
+                document.getElementById('score').textContent = score;
+                showCollectMessage('ACHAT: ' + allWeapons[index].name);
+                renderShop();
+            } else if (p.inventory.length >= MAX_WEAPONS) {
+                showCollectMessage('INVENTAIRE PLEIN');
+            }
+        }
+        
+        function closeShop() {
+            document.getElementById('weaponShop').style.display = 'none';
+            nextLevel();
+        }
+        
+        function gameLoop() {
+            update();
+            draw();
+            if (gameRunning) requestAnimationFrame(gameLoop);
+        }
+    </script>
+</body>
+</html>
