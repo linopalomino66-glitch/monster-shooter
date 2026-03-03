@@ -623,20 +623,4 @@
                 showCollectMessage('ACHAT: ' + allWeapons[index].name);
                 renderShop();
             } else if (p.inventory.length >= MAX_WEAPONS) {
-                showCollectMessage('INVENTAIRE PLEIN');
-            }
-        }
-        
-        function closeShop() {
-            document.getElementById('weaponShop').style.display = 'none';
-            nextLevel();
-        }
-        
-        function gameLoop() {
-            update();
-            draw();
-            if (gameRunning) requestAnimationFrame(gameLoop);
-        }
-    </script>
-</body>
-</html>
+                showCollectMessage('INVENTAIRE PLEIN'
